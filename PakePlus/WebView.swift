@@ -79,11 +79,53 @@ struct WebView: UIViewRepresentable {
                         if (!dismissKnownToast()) dismissFallback();
                     };
 
-                    new MutationObserver(dismissSileroWarning).observe(document.documentElement, {
+                    const normalizeText = (value) =>
+                        (value || '').replace(/\\s+/g, ' ').trim();
+
+                    const disclaimerTexts = new Set([
+                        'ChatGPT 也可能会犯错。请核查重要信息。',
+                        'ChatGPT 也会犯错，请核查重要信息。',
+                        'ChatGPT can make mistakes. Check important info.',
+                        'ChatGPT can make mistakes. Consider checking important information.'
+                    ]);
+
+                    const hideDisclaimer = () => {
+                        const walker = document.createTreeWalker(
+                            document.body,
+                            NodeFilter.SHOW_TEXT
+                        );
+                        while (walker.nextNode()) {
+                            const node = walker.currentNode;
+                            const text = normalizeText(node.nodeValue);
+                            if (!disclaimerTexts.has(text)) continue;
+
+                            let container = node.parentElement;
+                            let outermostExactContainer = container;
+                            while (container?.parentElement) {
+                                const parent = container.parentElement;
+                                if (parent === document.body) break;
+                                if (normalizeText(parent.textContent) !== text) break;
+                                outermostExactContainer = parent;
+                                container = parent;
+                            }
+                            outermostExactContainer?.style.setProperty(
+                                'display',
+                                'none',
+                                'important'
+                            );
+                        }
+                    };
+
+                    const applyCompatibilityFixes = () => {
+                        dismissSileroWarning();
+                        hideDisclaimer();
+                    };
+
+                    new MutationObserver(applyCompatibilityFixes).observe(document.documentElement, {
                         childList: true,
                         subtree: true
                     });
-                    dismissSileroWarning();
+                    applyCompatibilityFixes();
                 })();
             """,
             injectionTime: .atDocumentEnd,
