@@ -26,8 +26,8 @@
 	<key>USERAGENT</key>
 	<string></string>
 	<key>WEBURL</key>
-	<string>https://www.pakeplus.com/</string>
+	<string>https://grok.com/</string>
 	<key>CFBundleDisplayName</key>
-	<string>PakePlus</string>
+	<string>Grok</string>
 </dict>
 </plist>

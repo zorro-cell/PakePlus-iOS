@@ -156,14 +156,14 @@
         }
     },
     "ios": {
-        "name": "ChatGPT",
-        "showName": "ChatGPT",
-        "version": "1.4.0",
-        "webUrl": "https://chatgpt.com/",
-        "id": "com.zorrocell.chatgpt.webapp",
+        "name": "Grok",
+        "showName": "Grok",
+        "version": "1.0.0",
+        "webUrl": "https://grok.com/",
+        "id": "com.zorrocell.grok.webapp",
         "icon": "./app-icon.png",
-        "desc": "Personal iOS wrapper for the ChatGPT website.",
-        "pubBody": "Immersive ChatGPT wrapper with compact composer layout and iOS voice compatibility handling.",
+        "desc": "Personal iOS wrapper for the Grok website.",
+        "pubBody": "Immersive Grok wrapper for iOS 16.6 and TrollStore.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"
