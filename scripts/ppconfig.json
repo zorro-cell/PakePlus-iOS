@@ -156,17 +156,17 @@
         }
     },
     "ios": {
-        "name": "PakePlus",
-        "showName": "PakePlus",
-        "version": "0.0.1",
-        "webUrl": "https://juejin.cn/",
-        "id": "com.xiaoshen.pakeplus.ios",
+        "name": "ChatGPT",
+        "showName": "ChatGPT",
+        "version": "1.0.0",
+        "webUrl": "https://chatgpt.com/",
+        "id": "com.zorrocell.chatgpt.webapp",
         "icon": "./app-icon.png",
-        "desc": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途）",
-        "pubBody": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途）",
+        "desc": "Personal iOS wrapper for the ChatGPT website.",
+        "pubBody": "ChatGPT website wrapper for personal use on iOS 15.6 and later.",
         "isHtml": false,
         "debug": false,
-        "safeArea": "all"
+        "safeArea": "safe"
     },
     "android": {
         "name": "PakePlus",

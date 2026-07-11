@@ -30,7 +30,6 @@ struct ContentView: View {
                     isWebLoaded = true
                 }
             )
-            .ignoresSafeArea(edges: [.all])
             .allowsHitTesting(isWebLoaded)
             
             // loading screen
@@ -42,6 +41,8 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
+        .background(Color.black.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .statusBarHidden(fullScreen)
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = screenOn
