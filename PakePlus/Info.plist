@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>DEBUG</key>
-	<true/>
+	<false/>
 	<key>FULLSCREEN</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
