@@ -1,104 +1,37 @@
+import SafariServices
 import SwiftUI
 import UIKit
-import WebKit
 
-struct WebView: UIViewRepresentable {
+/// Grok's account service and third-party identity providers reject embedded
+/// WKWebView authentication. SFSafariViewController provides Apple's supported
+/// secure browser context and keeps the complete sign-in redirect chain in one
+/// persistent Safari session.
+struct WebView: UIViewControllerRepresentable {
     let webUrl: URL
     let debug: Bool
     let onLoadFinished: (() -> Void)?
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onLoadFinished: onLoadFinished)
-    }
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let configuration = SFSafariViewController.Configuration()
+        configuration.entersReaderIfAvailable = false
+        configuration.barCollapsingEnabled = true
 
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
-        configuration.allowsInlineMediaPlayback = true
-        configuration.allowsPictureInPictureMediaPlayback = true
-        configuration.allowsAirPlayForMediaPlayback = true
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-
-        let viewportScript = WKUserScript(
-            source: """
-                var meta = document.querySelector('meta[name=viewport]');
-                if (!meta) {
-                    meta = document.createElement('meta');
-                    meta.name = 'viewport';
-                    document.head.appendChild(meta);
-                }
-                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            """,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: true
+        let controller = SFSafariViewController(
+            url: webUrl,
+            configuration: configuration
         )
-        configuration.userContentController.addUserScript(viewportScript)
+        controller.preferredBarTintColor = .black
+        controller.preferredControlTintColor = .white
+        controller.dismissButtonStyle = .close
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.navigationDelegate = context.coordinator
-        webView.uiDelegate = context.coordinator
-        webView.allowsBackForwardNavigationGestures = true
-        webView.isOpaque = true
-        webView.backgroundColor = .black
-        webView.scrollView.backgroundColor = .black
-
-        // Match Mobile Safari on the user's iOS release. This restores the
-        // immersive WKWebView UI while improving compatibility with web auth.
-        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
-
-        if #available(iOS 16.4, *) {
-            webView.isInspectable = debug
+        DispatchQueue.main.async {
+            onLoadFinished?()
         }
-        webView.load(URLRequest(url: webUrl))
-        return webView
+        return controller
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-}
-
-final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-    private let onLoadFinished: (() -> Void)?
-    private var didFinishOnce = false
-
-    init(onLoadFinished: (() -> Void)?) {
-        self.onLoadFinished = onLoadFinished
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        guard !didFinishOnce else { return }
-        didFinishOnce = true
-        onLoadFinished?()
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
-        for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
-    ) -> WKWebView? {
-        if navigationAction.targetFrame == nil,
-           let url = navigationAction.request.url {
-            webView.load(URLRequest(url: url))
-        }
-        return nil
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-    ) {
-        guard let url = navigationAction.request.url,
-              let scheme = url.scheme?.lowercased() else {
-            decisionHandler(.allow)
-            return
-        }
-
-        if !["http", "https", "about", "blob", "data"].contains(scheme) {
-            UIApplication.shared.open(url)
-            decisionHandler(.cancel)
-            return
-        }
-        decisionHandler(.allow)
-    }
+    func updateUIViewController(
+        _ uiViewController: SFSafariViewController,
+        context: Context
+    ) {}
 }
