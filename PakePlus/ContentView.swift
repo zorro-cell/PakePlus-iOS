@@ -30,6 +30,7 @@ struct ContentView: View {
                     isWebLoaded = true
                 }
             )
+            .ignoresSafeArea(edges: [.bottom])
             .allowsHitTesting(isWebLoaded)
             
             // loading screen

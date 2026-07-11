@@ -34,6 +34,63 @@ struct WebView: UIViewRepresentable {
         )
         configuration.userContentController.addUserScript(viewportScript)
 
+        let compatibilityScript = WKUserScript(
+            source: """
+                (() => {
+                    const marker = 'Silero VAD failed to load';
+
+                    const dismissKnownToast = () => {
+                        const selectors = [
+                            '[role="alert"]',
+                            '[data-sonner-toast]',
+                            '[data-testid*="toast"]'
+                        ];
+                        for (const element of document.querySelectorAll(selectors.join(','))) {
+                            if (!element.textContent?.includes(marker)) continue;
+                            const button = element.querySelector('button');
+                            if (button) button.click();
+                            else element.remove();
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    const dismissFallback = () => {
+                        const walker = document.createTreeWalker(
+                            document.body,
+                            NodeFilter.SHOW_TEXT
+                        );
+                        while (walker.nextNode()) {
+                            const node = walker.currentNode;
+                            if (!node.nodeValue?.includes(marker)) continue;
+                            let container = node.parentElement;
+                            for (let depth = 0; container && depth < 6; depth++) {
+                                const button = container.querySelector('button');
+                                if (button && container.textContent.length < 600) {
+                                    button.click();
+                                    return;
+                                }
+                                container = container.parentElement;
+                            }
+                        }
+                    };
+
+                    const dismissSileroWarning = () => {
+                        if (!dismissKnownToast()) dismissFallback();
+                    };
+
+                    new MutationObserver(dismissSileroWarning).observe(document.documentElement, {
+                        childList: true,
+                        subtree: true
+                    });
+                    dismissSileroWarning();
+                })();
+            """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        configuration.userContentController.addUserScript(compatibilityScript)
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator

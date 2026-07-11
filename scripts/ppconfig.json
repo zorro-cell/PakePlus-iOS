@@ -158,12 +158,12 @@
     "ios": {
         "name": "ChatGPT",
         "showName": "ChatGPT",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "webUrl": "https://chatgpt.com/",
         "id": "com.zorrocell.chatgpt.webapp",
         "icon": "./app-icon.png",
         "desc": "Personal iOS wrapper for the ChatGPT website.",
-        "pubBody": "Immersive ChatGPT website wrapper with Mobile Safari compatibility mode.",
+        "pubBody": "Immersive ChatGPT wrapper with corrected bottom safe area and iOS voice compatibility handling.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"
