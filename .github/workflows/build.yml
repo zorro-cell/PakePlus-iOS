@@ -22,7 +22,7 @@ jobs:
             - name: Set up Xcode
               uses: maxim-lobanov/setup-xcode@v1
               with:
-                  xcode-version: '16.4'
+                  xcode-version: latest-stable
 
             - uses: pnpm/action-setup@v4
               with:
