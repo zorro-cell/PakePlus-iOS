@@ -158,12 +158,12 @@
     "ios": {
         "name": "Grok",
         "showName": "Grok",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "webUrl": "https://grok.com/",
         "id": "com.zorrocell.grok.webapp",
         "icon": "./app-icon.png",
         "desc": "Personal iOS wrapper for the Grok website.",
-        "pubBody": "Immersive Grok wrapper with a current Mobile Safari compatibility identity for iOS 16.6 and TrollStore.",
+        "pubBody": "Immersive Grok wrapper with a state-preserving OAuth authorization window for iOS 16.6 and TrollStore.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"

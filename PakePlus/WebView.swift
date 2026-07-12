@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 import WebKit
 
+private let grokSafariUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1"
+
 struct WebView: UIViewRepresentable {
     let webUrl: URL
     let debug: Bool
@@ -45,7 +47,7 @@ struct WebView: UIViewRepresentable {
         // xAI's current native app and account service require a newer iOS
         // browser environment. Present a supported Mobile Safari identity while
         // retaining the immersive web container needed on the iOS 16.6 device.
-        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1"
+        webView.customUserAgent = grokSafariUserAgent
 
         if #available(iOS 16.4, *) {
             webView.isInspectable = debug
@@ -60,6 +62,7 @@ struct WebView: UIViewRepresentable {
 final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     private let onLoadFinished: (() -> Void)?
     private var didFinishOnce = false
+    private weak var authenticationWebView: WKWebView?
 
     init(onLoadFinished: (() -> Void)?) {
         self.onLoadFinished = onLoadFinished
@@ -77,11 +80,33 @@ final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        if navigationAction.targetFrame == nil,
-           let url = navigationAction.request.url {
-            webView.load(URLRequest(url: url))
-        }
-        return nil
+        guard navigationAction.targetFrame == nil else { return nil }
+
+        // OAuth relies on a real auxiliary browsing context and window.opener.
+        // Returning a WebKit-created child preserves that relationship, the
+        // shared data store, redirect state, and the window.close callback.
+        authenticationWebView?.removeFromSuperview()
+
+        let popup = WKWebView(frame: webView.bounds, configuration: configuration)
+        popup.navigationDelegate = self
+        popup.uiDelegate = self
+        popup.customUserAgent = grokSafariUserAgent
+        popup.allowsBackForwardNavigationGestures = true
+        popup.isOpaque = true
+        popup.backgroundColor = .black
+        popup.scrollView.backgroundColor = .black
+        popup.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        webView.addSubview(popup)
+        authenticationWebView = popup
+        return popup
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        guard let authenticationWebView,
+              webView === authenticationWebView else { return }
+        webView.removeFromSuperview()
+        self.authenticationWebView = nil
     }
 
     func webView(
