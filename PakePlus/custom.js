@@ -136,51 +136,6 @@
     installSpeechConstructor('webkitSpeechRecognition')
 })()
 
-// Extend the web document into the physical screen while preserving enough
-// bottom padding around the composer for the Home indicator.
-;(() => {
-    const style = document.createElement('style')
-    style.id = 'pp-safe-area-style'
-    style.textContent = `
-        html, body, #root { min-height: 100%; min-height: 100dvh; }
-        body { margin: 0; }
-        .pp-safe-area-bottom {
-            padding-bottom: calc(var(--pp-original-padding-bottom, 0px) + env(safe-area-inset-bottom)) !important;
-        }
-    `
-
-    const install = () => {
-        if (!document.head || !document.documentElement) {
-            setTimeout(install, 0)
-            return
-        }
-        if (!document.getElementById(style.id)) document.head.appendChild(style)
-
-        const patchComposer = () => {
-            const controls = document.querySelectorAll(
-                'textarea, [contenteditable="true"], input[type="text"], input:not([type])'
-            )
-            controls.forEach((control) => {
-                const rect = control.getBoundingClientRect()
-                if (rect.bottom < window.innerHeight * 0.55) return
-                const container = control.closest('form, footer, [role="toolbar"]') || control.parentElement
-                if (!container || container.classList.contains('pp-safe-area-bottom')) return
-                const computed = getComputedStyle(container)
-                container.style.setProperty('--pp-original-padding-bottom', computed.paddingBottom || '0px')
-                container.classList.add('pp-safe-area-bottom')
-            })
-        }
-
-        patchComposer()
-        new MutationObserver(patchComposer).observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-        })
-        window.addEventListener('resize', patchComposer, { passive: true })
-    }
-    install()
-})()
-
 const __pp_isBlobUrl = (url) =>
     typeof url === 'string' && url.startsWith('blob:')
 

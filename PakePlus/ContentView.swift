@@ -22,9 +22,9 @@ struct ContentView: View {
     var body: some View {
         // BottomMenuView()
         ZStack {
-            // Keep the hosting view edge-to-edge so WKWebView can draw behind
-            // the status bar and Home indicator when viewport-fit=cover is set.
-            Color.clear
+            // Extend only the page background into the physical screen edges.
+            // Interactive web content remains inside the SwiftUI safe area.
+            Color("HermesBackground")
                 .ignoresSafeArea(.container, edges: .all)
 
             // webview
@@ -36,7 +36,7 @@ struct ContentView: View {
                 }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea(.container, edges: .all)
+            .padding(.top, -4)
             .allowsHitTesting(isWebLoaded)
             
             // loading screen
@@ -48,7 +48,6 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .ignoresSafeArea(.container, edges: .all)
         .statusBarHidden(fullScreen)
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = screenOn
