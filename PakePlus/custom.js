@@ -136,6 +136,29 @@
     installSpeechConstructor('webkitSpeechRecognition')
 })()
 
+// Lock web content into the safe area while the page background
+// (Hermes blurred wallpaper) extends edge-to-edge via viewport-fit=cover.
+;(() => {
+    const style = document.createElement('style')
+    style.id = 'pp-safe-layout'
+    style.textContent = `
+        :root {
+            --pp-safe-top: env(safe-area-inset-top, 0px);
+            --pp-safe-bottom: env(safe-area-inset-bottom, 0px);
+            --pp-app-height: calc(100dvh - var(--pp-safe-top) - var(--pp-safe-bottom));
+        }
+        html, body { height: 100%; margin: 0; background: transparent; }
+        #root, #app, [data-hermes-root] {
+            height: var(--pp-app-height) !important;
+            min-height: 0 !important;
+            max-height: var(--pp-app-height) !important;
+            margin-top: var(--pp-safe-top);
+            box-sizing: border-box;
+        }
+    `
+    document.head.appendChild(style)
+})()
+
 const __pp_isBlobUrl = (url) =>
     typeof url === 'string' && url.startsWith('blob:')
 

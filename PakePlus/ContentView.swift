@@ -22,9 +22,9 @@ struct ContentView: View {
     var body: some View {
         // BottomMenuView()
         ZStack {
-            // Extend only the page background into the physical screen edges.
-            // Interactive web content remains inside the SwiftUI safe area.
-            Color("HermesBackground")
+            // Keep the native host transparent so the Hermes web wallpaper can
+            // extend behind the status bar and Home indicator.
+            Color.clear
                 .ignoresSafeArea(.container, edges: .all)
 
             // webview
@@ -37,6 +37,7 @@ struct ContentView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, -4)
+            .ignoresSafeArea(.container, edges: .all)
             .allowsHitTesting(isWebLoaded)
             
             // loading screen
@@ -48,6 +49,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
+        .ignoresSafeArea(.container, edges: .all)
         .statusBarHidden(fullScreen)
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = screenOn

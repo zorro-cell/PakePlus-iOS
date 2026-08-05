@@ -82,9 +82,9 @@ struct WebView: UIViewRepresentable {
             webView.customUserAgent = userAgent
         }
 
-        // Use one standard viewport element; the native background alone fills safe areas.
+        // Use one viewport element and opt the page into drawing behind all safe areas.
         let scriptInjection = WKUserScript(
-            source: WebView.standardViewportScript,
+            source: WebView.fullScreenViewportScript,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )
@@ -778,7 +778,7 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
 }
 
 extension WebView {
-    static let standardViewportScript = #"""
+    static let fullScreenViewportScript = #"""
     (() => {
         const installViewport = () => {
             if (!document.head) {
@@ -788,7 +788,7 @@ extension WebView {
             const viewports = [...document.querySelectorAll('meta[name="viewport"]')];
             const meta = viewports.shift() || document.createElement('meta');
             meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
             viewports.forEach((duplicate) => duplicate.remove());
             if (!meta.isConnected) document.head.appendChild(meta);
         };
