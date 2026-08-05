@@ -8,6 +8,7 @@
 import AVFoundation
 import CoreLocation
 import SwiftUI
+import UserNotifications
 import WebKit
 
 struct WebView: UIViewRepresentable {
@@ -48,6 +49,16 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .clear
         // JS bridge: blob download
         webView.configuration.userContentController.add(context.coordinator, name: "blobDownload")
+        webView.configuration.userContentController.add(context.coordinator, name: "hermesTaskCompleted")
+
+        // Observe Hermes SSE/fetch streaming and use DOM-idle detection as a fallback.
+        let completionScript = WKUserScript(
+            source: WebView.hermesCompletionScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        webView.configuration.userContentController.addUserScript(completionScript)
+        context.coordinator.prepareNotificationAuthorization()
 
         // debug script
         if debug, let debugScript = WebView.loadJSFile(named: "vConsole") {
@@ -126,7 +137,7 @@ struct WebView: UIViewRepresentable {
 }
 
 // swifui coordinator
-class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, CLLocationManagerDelegate {
+class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, CLLocationManagerDelegate, UNUserNotificationCenterDelegate {
     private let onLoadFinished: (() -> Void)?
     private var didFinishMainFrameOnce = false
     private var locationManager: CLLocationManager?
@@ -277,6 +288,11 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
     // MARK: - WKScriptMessageHandler (blob download bridge)
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "hermesTaskCompleted" {
+            postTaskCompletionNotification()
+            return
+        }
+
         guard message.name == "blobDownload" else { return }
         guard let body = message.body as? [String: Any] else { return }
 
@@ -327,6 +343,50 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
 
         default:
             return
+        }
+    }
+
+    // MARK: - Hermes task completion notifications
+
+    func prepareNotificationAuthorization() {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                print("notification authorization failed: \(error.localizedDescription)")
+            } else {
+                print("notification authorization granted: \(granted)")
+            }
+        }
+    }
+
+    private func postTaskCompletionNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "hermes"
+        content.body = "Hermes 已完成任务"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "hermes-task-complete-\(UUID().uuidString)",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.2, repeats: false)
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("failed to schedule task notification: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .sound])
+        } else {
+            completionHandler([.alert, .sound])
         }
     }
 
@@ -515,6 +575,145 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
 }
 
 extension WebView {
+    static let hermesCompletionScript = #"""
+    (() => {
+        if (window.__hermesCompletionObserverInstalled) return;
+        window.__hermesCompletionObserverInstalled = true;
+
+        const bridge = window.webkit?.messageHandlers?.hermesTaskCompleted;
+        let armed = false;
+        let streamActive = 0;
+        let sawResponseActivity = false;
+        let lastActivityAt = 0;
+        let lastNotificationAt = 0;
+        let initialTextLength = 0;
+
+        const now = () => Date.now();
+        const arm = () => {
+            armed = true;
+            sawResponseActivity = false;
+            lastActivityAt = now();
+            initialTextLength = document.body?.innerText?.length || 0;
+        };
+        const notify = (reason) => {
+            if (!armed || now() - lastNotificationAt < 5000) return;
+            armed = false;
+            streamActive = 0;
+            lastNotificationAt = now();
+            bridge?.postMessage({ reason, at: new Date().toISOString() });
+        };
+        const isDoneMarker = (text) =>
+            /(?:^|\n)\s*(?:data:\s*)?(?:\[DONE\]|done)\s*(?:\n|$)/i.test(text) ||
+            /"(?:type|event|status)"\s*:\s*"(?:done|complete|completed|message_stop|response\.completed)"/i.test(text);
+
+        const nativeFetch = window.fetch?.bind(window);
+        if (nativeFetch) {
+            window.fetch = async (...args) => {
+                const input = args[0];
+                const init = args[1] || {};
+                const method = String(init.method || input?.method || 'GET').toUpperCase();
+                if (method !== 'GET') arm();
+                const response = await nativeFetch(...args);
+                const type = response.headers?.get('content-type') || '';
+                if (/text\/event-stream/i.test(type) && response.body) {
+                    streamActive += 1;
+                    const clone = response.clone();
+                    (async () => {
+                        const reader = clone.body.getReader();
+                        const decoder = new TextDecoder();
+                        let tail = '';
+                        try {
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) break;
+                                const text = decoder.decode(value, { stream: true });
+                                if (text) {
+                                    sawResponseActivity = true;
+                                    lastActivityAt = now();
+                                    tail = (tail + text).slice(-4096);
+                                    if (isDoneMarker(tail)) {
+                                        notify('sse-done');
+                                        return;
+                                    }
+                                }
+                            }
+                            if (sawResponseActivity) notify('fetch-stream-closed');
+                        } catch (_) {
+                            // The DOM fallback covers streams whose clone is cancelled.
+                        } finally {
+                            streamActive = Math.max(0, streamActive - 1);
+                        }
+                    })();
+                }
+                return response;
+            };
+        }
+
+        const NativeEventSource = window.EventSource;
+        if (NativeEventSource) {
+            const WrappedEventSource = function(...args) {
+                arm();
+                const source = new NativeEventSource(...args);
+                streamActive += 1;
+                let gotData = false;
+                source.addEventListener('message', (event) => {
+                    gotData = true;
+                    sawResponseActivity = true;
+                    lastActivityAt = now();
+                    if (isDoneMarker(String(event.data || ''))) notify('eventsource-done');
+                });
+                source.addEventListener('error', () => {
+                    if (source.readyState === NativeEventSource.CLOSED) {
+                        streamActive = Math.max(0, streamActive - 1);
+                        if (gotData) notify('eventsource-closed');
+                    }
+                });
+                return source;
+            };
+            WrappedEventSource.prototype = NativeEventSource.prototype;
+            Object.defineProperties(WrappedEventSource, {
+                CONNECTING: { value: NativeEventSource.CONNECTING },
+                OPEN: { value: NativeEventSource.OPEN },
+                CLOSED: { value: NativeEventSource.CLOSED }
+            });
+            window.EventSource = WrappedEventSource;
+        }
+
+        const markDomActivity = () => {
+            if (!armed) return;
+            sawResponseActivity = true;
+            lastActivityAt = now();
+        };
+        const installDomFallback = () => {
+            if (!document.documentElement) return setTimeout(installDomFallback, 50);
+            new MutationObserver(markDomActivity).observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+            document.addEventListener('submit', arm, true);
+            document.addEventListener('click', (event) => {
+                const button = event.target?.closest?.('button');
+                if (!button) return;
+                const label = [button.innerText, button.getAttribute('aria-label'), button.title]
+                    .filter(Boolean).join(' ');
+                if (/(send|submit|发送|提交)/i.test(label) && !/(stop|停止|取消)/i.test(label)) arm();
+            }, true);
+            setInterval(() => {
+                if (!armed || !sawResponseActivity || streamActive > 0) return;
+                const textGrew = (document.body?.innerText?.length || 0) > initialTextLength;
+                const stopControl = [...document.querySelectorAll('button')].some((button) => {
+                    const label = [button.innerText, button.getAttribute('aria-label'), button.title]
+                        .filter(Boolean).join(' ');
+                    return /(stop|停止生成|停止响应|取消生成)/i.test(label);
+                });
+                if (textGrew && !stopControl && now() - lastActivityAt > 8000) notify('dom-idle');
+            }, 2000);
+        };
+        installDomFallback();
+    })();
+    """#
+
     // load js file from bundle
     static func loadJSFile(named filename: String) -> String? {
         guard let path = Bundle.main.path(forResource: filename, ofType: "js") else {

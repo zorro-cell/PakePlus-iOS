@@ -13,7 +13,12 @@
     "devbug": false,
     "version": "0.0.1",
     "preview": "desktop",
-    "platform": ["1-1", "1-2", "2-1", "2-2"],
+    "platform": [
+        "1-1",
+        "1-2",
+        "2-1",
+        "2-2"
+    ],
     "width": 800,
     "height": 600,
     "desc": "",
@@ -84,7 +89,7 @@
         "position": false,
         "direction": "default",
         "callPhone": false,
-        "microphone": false,
+        "microphone": true,
         "camera": false,
         "backgroundPlay": false,
         "compress": false,
@@ -156,17 +161,17 @@
         }
     },
     "ios": {
-        "name": "PakePlus",
-        "showName": "PakePlus",
-        "version": "0.0.1",
-        "webUrl": "https://juejin.cn/",
-        "id": "com.xiaoshen.pakeplus.ios",
+        "name": "hermes",
+        "showName": "hermes",
+        "version": "1.0.0",
+        "webUrl": "http://192.168.31.5:8748",
+        "id": "com.zorrocell.hermes.webapp",
         "icon": "./app-icon.png",
-        "desc": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途）",
-        "pubBody": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途）",
+        "desc": "Hermes Studio iOS wrapper with local task completion notifications.",
+        "pubBody": "Unsigned Hermes Studio IPA for TrollStore. Includes local task completion notifications.",
         "isHtml": false,
         "debug": false,
-        "safeArea": "all"
+        "safeArea": "safe"
     },
     "android": {
         "name": "PakePlus",

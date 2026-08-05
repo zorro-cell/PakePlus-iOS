@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>DEBUG</key>
-	<true/>
+	<false/>
 	<key>FULLSCREEN</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -26,8 +26,10 @@
 	<key>USERAGENT</key>
 	<string></string>
 	<key>WEBURL</key>
-	<string>https://www.pakeplus.com/</string>
+	<string>http://192.168.31.5:8748</string>
 	<key>CFBundleDisplayName</key>
-	<string>PakePlus</string>
+	<string>hermes</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Hermes 需要使用麦克风进行语音输入。</string>
 </dict>
 </plist>
