@@ -163,12 +163,12 @@
     "ios": {
         "name": "hermes",
         "showName": "hermes",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "webUrl": "http://192.168.31.5:8748",
         "id": "com.zorrocell.hermes.webapp",
         "icon": "./app-icon.png",
-        "desc": "Hermes Studio iOS wrapper with local task completion notifications.",
-        "pubBody": "Unsigned Hermes Studio IPA for TrollStore. Includes local task completion notifications.",
+        "desc": "Hermes Studio iOS wrapper with full-screen layout, native speech input, and local task completion notifications.",
+        "pubBody": "Unsigned Hermes Studio v1.0.1 IPA for TrollStore. Fixes safe-area black bars and adds native iOS speech recognition.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"

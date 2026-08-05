@@ -7,6 +7,7 @@
 
 import AVFoundation
 import CoreLocation
+import Speech
 import SwiftUI
 import UserNotifications
 import WebKit
@@ -47,9 +48,12 @@ struct WebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         // JS bridge: blob download
         webView.configuration.userContentController.add(context.coordinator, name: "blobDownload")
         webView.configuration.userContentController.add(context.coordinator, name: "hermesTaskCompleted")
+        webView.configuration.userContentController.add(context.coordinator, name: "speechBridge")
+        context.coordinator.webView = webView
 
         // Observe Hermes SSE/fetch streaming and use DOM-idle detection as a fallback.
         let completionScript = WKUserScript(
@@ -78,14 +82,12 @@ struct WebView: UIViewRepresentable {
             webView.customUserAgent = userAgent
         }
 
-        // disable double tap zoom
-        let script = """
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            document.head.appendChild(meta);
-        """
-        let scriptInjection = WKUserScript(source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        // Use one viewport element and opt the page into drawing behind all safe areas.
+        let scriptInjection = WKUserScript(
+            source: WebView.fullScreenViewportScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
         webView.configuration.userContentController.addUserScript(scriptInjection)
 
         // load custom script
@@ -141,6 +143,16 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
     private let onLoadFinished: (() -> Void)?
     private var didFinishMainFrameOnce = false
     private var locationManager: CLLocationManager?
+    weak var webView: WKWebView?
+
+    // Native speech-recognition state used by the injected Web Speech compatible bridge.
+    private let speechAudioEngine = AVAudioEngine()
+    private var speechRecognizer: SFSpeechRecognizer?
+    private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var speechTask: SFSpeechRecognitionTask?
+    private var speechInstanceID: String?
+    private var speechIsStopping = false
+    private var speechTapInstalled = false
 
     // init
     init(onLoadFinished: (() -> Void)?) {
@@ -293,6 +305,11 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
             return
         }
 
+        if message.name == "speechBridge" {
+            handleSpeechBridgeMessage(message.body)
+            return
+        }
+
         guard message.name == "blobDownload" else { return }
         guard let body = message.body as? [String: Any] else { return }
 
@@ -343,6 +360,192 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
 
         default:
             return
+        }
+    }
+
+    // MARK: - Native Speech bridge
+
+    private func handleSpeechBridgeMessage(_ messageBody: Any) {
+        guard let body = messageBody as? [String: Any] else { return }
+        let action = (body["action"] as? String) ?? ""
+        let instanceID = (body["instanceId"] as? String) ?? ""
+        guard !instanceID.isEmpty else { return }
+
+        switch action {
+        case "start":
+            let language = ((body["lang"] as? String) ?? "zh-CN").trimmingCharacters(in: .whitespacesAndNewlines)
+            requestSpeechPermissionsAndStart(instanceID: instanceID, language: language.isEmpty ? "zh-CN" : language)
+        case "stop":
+            guard speechInstanceID == instanceID else { return }
+            stopSpeechRecognition(abort: false)
+        case "abort":
+            guard speechInstanceID == instanceID else { return }
+            stopSpeechRecognition(abort: true)
+        default:
+            break
+        }
+    }
+
+    private func requestSpeechPermissionsAndStart(instanceID: String, language: String) {
+        if speechInstanceID != nil {
+            stopSpeechRecognition(abort: true)
+        }
+        speechInstanceID = instanceID
+        speechIsStopping = false
+
+        SFSpeechRecognizer.requestAuthorization { [weak self] speechStatus in
+            DispatchQueue.main.async {
+                guard let self, self.speechInstanceID == instanceID else { return }
+                guard speechStatus == .authorized else {
+                    self.finishSpeechRecognition(error: "not-allowed", message: "语音识别权限未开启")
+                    return
+                }
+
+                AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+                    DispatchQueue.main.async {
+                        guard let self, self.speechInstanceID == instanceID else { return }
+                        guard granted else {
+                            self.finishSpeechRecognition(error: "not-allowed", message: "麦克风权限未开启")
+                            return
+                        }
+                        self.startSpeechRecognition(instanceID: instanceID, language: language)
+                    }
+                }
+            }
+        }
+    }
+
+    private func startSpeechRecognition(instanceID: String, language: String) {
+        let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language))
+            ?? SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+        guard let recognizer, recognizer.isAvailable else {
+            finishSpeechRecognition(error: "network", message: "Apple 语音识别服务暂不可用")
+            return
+        }
+
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+            let request = SFSpeechAudioBufferRecognitionRequest()
+            request.shouldReportPartialResults = true
+            if #available(iOS 16.0, *) {
+                request.addsPunctuation = true
+            }
+
+            let inputNode = speechAudioEngine.inputNode
+            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+                finishSpeechRecognition(error: "audio-capture", message: "麦克风音频格式不可用")
+                return
+            }
+
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+                request.append(buffer)
+            }
+            speechTapInstalled = true
+
+            speechRecognizer = recognizer
+            speechRequest = request
+            speechAudioEngine.prepare()
+            try speechAudioEngine.start()
+            emitSpeechEvent("start", instanceID: instanceID)
+
+            speechTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                DispatchQueue.main.async {
+                    guard let self, self.speechInstanceID == instanceID else { return }
+                    if let result {
+                        let transcript = result.bestTranscription.formattedString
+                        if !transcript.isEmpty {
+                            self.emitSpeechResult(transcript, isFinal: result.isFinal, instanceID: instanceID)
+                        }
+                        if result.isFinal {
+                            self.finishSpeechRecognition()
+                            return
+                        }
+                    }
+                    if let error, !self.speechIsStopping {
+                        let nsError = error as NSError
+                        let webError = nsError.code == 216 ? "aborted" : "network"
+                        self.finishSpeechRecognition(error: webError, message: error.localizedDescription)
+                    } else if error != nil {
+                        self.finishSpeechRecognition()
+                    }
+                }
+            }
+        } catch {
+            finishSpeechRecognition(error: "audio-capture", message: error.localizedDescription)
+        }
+    }
+
+    private func stopSpeechRecognition(abort: Bool) {
+        guard let instanceID = speechInstanceID else { return }
+        speechIsStopping = true
+        if speechAudioEngine.isRunning {
+            speechAudioEngine.stop()
+        }
+        removeSpeechAudioTapIfNeeded()
+
+        if abort {
+            speechRequest?.endAudio()
+            speechTask?.cancel()
+            emitSpeechEvent("error", instanceID: instanceID, payload: [
+                "error": "aborted",
+                "message": "语音识别已取消"
+            ])
+            finishSpeechRecognition()
+        } else {
+            speechRequest?.endAudio()
+        }
+    }
+
+    private func finishSpeechRecognition(error: String? = nil, message: String = "") {
+        guard let instanceID = speechInstanceID else { return }
+        if speechAudioEngine.isRunning {
+            speechAudioEngine.stop()
+        }
+        removeSpeechAudioTapIfNeeded()
+        speechRequest?.endAudio()
+        speechTask?.cancel()
+        speechRequest = nil
+        speechTask = nil
+        speechRecognizer = nil
+        speechInstanceID = nil
+        speechIsStopping = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+
+        if let error {
+            emitSpeechEvent("error", instanceID: instanceID, payload: ["error": error, "message": message])
+        }
+        emitSpeechEvent("end", instanceID: instanceID)
+    }
+
+    private func removeSpeechAudioTapIfNeeded() {
+        guard speechTapInstalled else { return }
+        speechAudioEngine.inputNode.removeTap(onBus: 0)
+        speechTapInstalled = false
+    }
+
+    private func emitSpeechResult(_ transcript: String, isFinal: Bool, instanceID: String) {
+        emitSpeechEvent("result", instanceID: instanceID, payload: [
+            "transcript": transcript,
+            "isFinal": isFinal,
+            "confidence": 1.0
+        ])
+    }
+
+    private func emitSpeechEvent(_ type: String, instanceID: String, payload: [String: Any] = [:]) {
+        var eventPayload = payload
+        eventPayload["type"] = type
+        eventPayload["instanceId"] = instanceID
+        guard JSONSerialization.isValidJSONObject(eventPayload),
+              let data = try? JSONSerialization.data(withJSONObject: eventPayload),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView?.evaluateJavaScript("window.__hermesSpeechBridgeReceive(\(json));") { _, evaluationError in
+            if let evaluationError {
+                print("speech bridge callback failed: \(evaluationError.localizedDescription)")
+            }
         }
     }
 
@@ -575,6 +778,24 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
 }
 
 extension WebView {
+    static let fullScreenViewportScript = #"""
+    (() => {
+        const installViewport = () => {
+            if (!document.head) {
+                setTimeout(installViewport, 0);
+                return;
+            }
+            const viewports = [...document.querySelectorAll('meta[name="viewport"]')];
+            const meta = viewports.shift() || document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+            viewports.forEach((duplicate) => duplicate.remove());
+            if (!meta.isConnected) document.head.appendChild(meta);
+        };
+        installViewport();
+    })();
+    """#
+
     static let hermesCompletionScript = #"""
     (() => {
         if (window.__hermesCompletionObserverInstalled) return;

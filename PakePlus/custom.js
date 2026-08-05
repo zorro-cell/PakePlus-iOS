@@ -1,5 +1,186 @@
 // very important, if you don't know what it is, don't touch it
 // 非常重要，不懂代码不要动，这里可以解决80%的问题，也可以生产1000+的bug
+
+// WKWebView does not implement the Web Speech API. Provide the browser-shaped
+// interface expected by Hermes and forward recognition to the native iOS bridge.
+;(() => {
+    const instances = new Map()
+    let nextInstanceId = 1
+
+    class HermesSpeechRecognition extends EventTarget {
+        constructor() {
+            super()
+            this.lang = 'zh-CN'
+            this.continuous = false
+            this.interimResults = false
+            this.maxAlternatives = 1
+            this.onstart = null
+            this.onresult = null
+            this.onerror = null
+            this.onend = null
+            this.onaudiostart = null
+            this.onaudioend = null
+            this.onspeechstart = null
+            this.onspeechend = null
+            this.__instanceId = `hermes_speech_${nextInstanceId++}`
+            this.__active = false
+            instances.set(this.__instanceId, this)
+        }
+
+        start() {
+            if (this.__active) {
+                const error = new DOMException('Recognition has already started', 'InvalidStateError')
+                throw error
+            }
+            const bridge = window.webkit?.messageHandlers?.speechBridge
+            if (!bridge) {
+                this.__dispatchError('service-not-allowed', 'iOS speech bridge is unavailable')
+                this.__dispatchEnd()
+                return
+            }
+            this.__active = true
+            bridge.postMessage({
+                action: 'start',
+                instanceId: this.__instanceId,
+                lang: this.lang || 'zh-CN',
+                continuous: Boolean(this.continuous),
+                interimResults: Boolean(this.interimResults),
+            })
+        }
+
+        stop() {
+            if (!this.__active) return
+            window.webkit?.messageHandlers?.speechBridge?.postMessage({
+                action: 'stop',
+                instanceId: this.__instanceId,
+            })
+        }
+
+        abort() {
+            if (!this.__active) return
+            window.webkit?.messageHandlers?.speechBridge?.postMessage({
+                action: 'abort',
+                instanceId: this.__instanceId,
+            })
+        }
+
+        __dispatch(name, event = {}) {
+            const domEvent = new Event(name)
+            Object.entries(event).forEach(([key, value]) => {
+                if (key !== 'type') Object.defineProperty(domEvent, key, { value, enumerable: true })
+            })
+            const handler = this[`on${name}`]
+            if (typeof handler === 'function') handler.call(this, domEvent)
+            this.dispatchEvent(domEvent)
+        }
+
+        __dispatchError(error, message) {
+            this.__dispatch('error', { type: 'error', error, message })
+        }
+
+        __dispatchEnd() {
+            this.__active = false
+            this.__dispatch('end', { type: 'end' })
+        }
+    }
+
+    window.__hermesSpeechBridgeReceive = (payload) => {
+        const recognition = instances.get(payload?.instanceId)
+        if (!recognition) return
+        switch (payload.type) {
+            case 'start':
+                recognition.__dispatch('start', { type: 'start' })
+                recognition.__dispatch('audiostart', { type: 'audiostart' })
+                recognition.__dispatch('speechstart', { type: 'speechstart' })
+                break
+            case 'result': {
+                if (!recognition.interimResults && !payload.isFinal) return
+                const alternative = {
+                    transcript: String(payload.transcript || ''),
+                    confidence: Number(payload.confidence ?? 1),
+                }
+                const result = [alternative]
+                result.isFinal = Boolean(payload.isFinal)
+                const results = [result]
+                recognition.__dispatch('result', {
+                    type: 'result',
+                    resultIndex: 0,
+                    results,
+                })
+                break
+            }
+            case 'error':
+                recognition.__dispatchError(payload.error || 'network', payload.message || '')
+                break
+            case 'end':
+                recognition.__dispatch('speechend', { type: 'speechend' })
+                recognition.__dispatch('audioend', { type: 'audioend' })
+                recognition.__dispatchEnd()
+                break
+        }
+    }
+
+    // Override WebKit's exposed stub as well as fill the unprefixed API.
+    const installSpeechConstructor = (name) => {
+        try {
+            Object.defineProperty(window, name, {
+                configurable: true,
+                writable: true,
+                value: HermesSpeechRecognition,
+            })
+        } catch (_) {
+            try { window[name] = HermesSpeechRecognition } catch (_) {}
+        }
+    }
+    installSpeechConstructor('SpeechRecognition')
+    installSpeechConstructor('webkitSpeechRecognition')
+})()
+
+// Extend the web document into the physical screen while preserving enough
+// bottom padding around the composer for the Home indicator.
+;(() => {
+    const style = document.createElement('style')
+    style.id = 'pp-safe-area-style'
+    style.textContent = `
+        html, body, #root { min-height: 100%; min-height: 100dvh; }
+        body { margin: 0; }
+        .pp-safe-area-bottom {
+            padding-bottom: calc(var(--pp-original-padding-bottom, 0px) + env(safe-area-inset-bottom)) !important;
+        }
+    `
+
+    const install = () => {
+        if (!document.head || !document.documentElement) {
+            setTimeout(install, 0)
+            return
+        }
+        if (!document.getElementById(style.id)) document.head.appendChild(style)
+
+        const patchComposer = () => {
+            const controls = document.querySelectorAll(
+                'textarea, [contenteditable="true"], input[type="text"], input:not([type])'
+            )
+            controls.forEach((control) => {
+                const rect = control.getBoundingClientRect()
+                if (rect.bottom < window.innerHeight * 0.55) return
+                const container = control.closest('form, footer, [role="toolbar"]') || control.parentElement
+                if (!container || container.classList.contains('pp-safe-area-bottom')) return
+                const computed = getComputedStyle(container)
+                container.style.setProperty('--pp-original-padding-bottom', computed.paddingBottom || '0px')
+                container.classList.add('pp-safe-area-bottom')
+            })
+        }
+
+        patchComposer()
+        new MutationObserver(patchComposer).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+        })
+        window.addEventListener('resize', patchComposer, { passive: true })
+    }
+    install()
+})()
+
 const __pp_isBlobUrl = (url) =>
     typeof url === 'string' && url.startsWith('blob:')
 
