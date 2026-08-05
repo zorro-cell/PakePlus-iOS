@@ -823,17 +823,27 @@ extension WebView {
             lastNotificationAt = now();
             bridge?.postMessage({ reason, at: new Date().toISOString() });
         };
+        const isChatRequest = (input) => {
+            const url = String(typeof input === 'string' ? input : input?.url || '').toLowerCase();
+            let path = url;
+            try { path = new URL(url, window.location.href).pathname.toLowerCase(); } catch (_) {}
+            if (!url || /(?:^|\/)(?:update|theme|sessions?|profiles?)(?:\/|$)/i.test(path)) {
+                return false;
+            }
+            return url.includes('chat') ||
+                /\/hermes\/chat(?:[\/?#]|$)/i.test(url) ||
+                /\/api\/hermes\/v1\/(?:messages?|responses?|completions?|stream)(?:[\/?#]|$)/i.test(url);
+        };
         const isDoneMarker = (text) =>
-            /(?:^|\n)\s*(?:data:\s*)?(?:\[DONE\]|done)\s*(?:\n|$)/i.test(text) ||
-            /"(?:type|event|status)"\s*:\s*"(?:done|complete|completed|message_stop|response\.completed)"/i.test(text);
+            /(?:^|\n)\s*(?:data:\s*)?\[DONE\]\s*(?:\n|$)/i.test(text) ||
+            /"(?:type|event)"\s*:\s*"(?:done|message_stop|response\.completed)"/i.test(text) ||
+            /(?:^|\n)\s*event:\s*(?:done|message_stop|response\.completed)\s*(?:\n|$)/i.test(text);
 
         const nativeFetch = window.fetch?.bind(window);
         if (nativeFetch) {
             window.fetch = async (...args) => {
                 const input = args[0];
-                const init = args[1] || {};
-                const method = String(init.method || input?.method || 'GET').toUpperCase();
-                if (method !== 'GET') arm();
+                if (isChatRequest(input)) arm();
                 const response = await nativeFetch(...args);
                 const type = response.headers?.get('content-type') || '';
                 if (/text\/event-stream/i.test(type) && response.body) {
@@ -843,6 +853,7 @@ extension WebView {
                         const reader = clone.body.getReader();
                         const decoder = new TextDecoder();
                         let tail = '';
+                        let sawDoneMarker = false;
                         try {
                             while (true) {
                                 const { value, done } = await reader.read();
@@ -852,13 +863,13 @@ extension WebView {
                                     sawResponseActivity = true;
                                     lastActivityAt = now();
                                     tail = (tail + text).slice(-4096);
-                                    if (isDoneMarker(tail)) {
+                                    if (!sawDoneMarker && isDoneMarker(tail)) {
+                                        sawDoneMarker = true;
                                         notify('sse-done');
-                                        return;
                                     }
                                 }
                             }
-                            if (sawResponseActivity) notify('fetch-stream-closed');
+                            if (armed && sawResponseActivity && sawDoneMarker) notify('fetch-stream-closed');
                         } catch (_) {
                             // The DOM fallback covers streams whose clone is cancelled.
                         } finally {
@@ -873,20 +884,24 @@ extension WebView {
         const NativeEventSource = window.EventSource;
         if (NativeEventSource) {
             const WrappedEventSource = function(...args) {
-                arm();
+                if (isChatRequest(args[0])) arm();
                 const source = new NativeEventSource(...args);
                 streamActive += 1;
                 let gotData = false;
+                let sawDoneMarker = false;
                 source.addEventListener('message', (event) => {
                     gotData = true;
                     sawResponseActivity = true;
                     lastActivityAt = now();
-                    if (isDoneMarker(String(event.data || ''))) notify('eventsource-done');
+                    if (!sawDoneMarker && isDoneMarker(String(event.data || ''))) {
+                        sawDoneMarker = true;
+                        notify('eventsource-done');
+                    }
                 });
                 source.addEventListener('error', () => {
                     if (source.readyState === NativeEventSource.CLOSED) {
                         streamActive = Math.max(0, streamActive - 1);
-                        if (gotData) notify('eventsource-closed');
+                        if (armed && gotData && sawDoneMarker) notify('eventsource-closed');
                     }
                 });
                 return source;
