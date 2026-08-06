@@ -163,12 +163,12 @@
     "ios": {
         "name": "hermes",
         "showName": "hermes",
-        "version": "1.0.3",
+        "version": "1.0.5",
         "webUrl": "http://192.168.31.5:8748",
         "id": "com.zorrocell.hermes.webapp",
         "icon": "./app-icon.png",
-        "desc": "Hermes Studio iOS wrapper with edge-to-edge web wallpaper, safe-area web content, native speech input, and local task completion notifications.",
-        "pubBody": "Unsigned Hermes Studio v1.0.3 IPA for TrollStore. Extends the Hermes web wallpaper edge-to-edge while locking content to the safe area.",
+        "desc": "Hermes Studio iOS wrapper with edge-to-edge web wallpaper, safe-area web content, and native speech input. In-app completion notifications removed — task alerts are delivered via Bark server-side push.",
+        "pubBody": "Unsigned Hermes Studio v1.0.5 IPA for TrollStore. Removes the in-app completion-notification JS/native code (superseded by Bark push), keeps native speech input and safe-area layout.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"
