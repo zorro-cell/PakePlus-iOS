@@ -282,3 +282,32 @@ window.open = function (url, target, features) {
 }
 
 document.addEventListener('click', hookClick, { capture: true })
+
+// === Hermes Studio v1.0.6: prevent stale chat after background → foreground ===
+// iOS WKWebView freezes SSE/EventSource while in background; users who switch
+// away to e.g. TikTok and come back see the page frozen on the pre-task state.
+// Compensate by auto-reloading on the page-visibility API + a 2-minute timer.
+// Background ticks are skipped so iOS suspending the JS timer is a no-op, not
+// a flood of reloads on resume. A short grace window (30s) avoids stomping on
+// a page the user is actively looking at.
+;(function installAutoRefresh() {
+    const REFRESH_INTERVAL = 2 * 60 * 1000   // 2 min while page is visible
+    const RESUME_GRACE = 30 * 1000           // reload on resume only if stale
+    let lastReloadAt = Date.now()
+
+    function reload() {
+        lastReloadAt = Date.now()
+        location.reload()
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Date.now() - lastReloadAt > RESUME_GRACE) {
+            reload()
+        }
+    })
+
+    setInterval(() => {
+        if (document.hidden) return
+        reload()
+    }, REFRESH_INTERVAL)
+})()
