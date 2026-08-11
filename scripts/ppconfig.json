@@ -163,12 +163,12 @@
     "ios": {
         "name": "hermes",
         "showName": "hermes",
-        "version": "1.0.6",
-        "webUrl": "http://192.168.31.5:8748",
+        "version": "1.0.7",
+        "webUrl": "https://192.168.31.5:8443",
         "id": "com.zorrocell.hermes.webapp",
         "icon": "./app-icon.png",
-        "desc": "Hermes Studio iOS wrapper with edge-to-edge web wallpaper, safe-area web content, and native speech input. v1.0.6 adds 2-minute auto-refresh + resume reload so background tasks don't leave the chat view frozen on switchback.",
-        "pubBody": "Unsigned Hermes Studio v1.0.6 IPA for TrollStore. Adds 2-minute auto-refresh + resume reload so background tasks don't leave the chat view frozen on switchback. Built on the v1.0.5 baseline.",
+        "desc": "Hermes Studio iOS wrapper with edge-to-edge web wallpaper, safe-area web content, and native speech input. v1.0.7 switches to HTTPS (secure context for mic) and allows audio autoplay so AI voice replies play without a tap.",
+        "pubBody": "Unsigned Hermes Studio v1.0.7 IPA for TrollStore. HTTPS webUrl (secure context for microphone) + WKWebView media autoplay enabled so voice replies play automatically. Built on the v1.0.6 baseline.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"

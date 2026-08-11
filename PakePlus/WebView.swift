@@ -31,6 +31,9 @@ struct WebView: UIViewRepresentable {
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.allowsAirPlayForMediaPlayback = true
         webConfiguration.allowsPictureInPictureMediaPlayback = true
+        // v1.0.7: 允许 AI 语音回复自动播放（无需用户手势）。WKWebView 默认要求手势才能出声，
+        // 会导致 Hermes 的 TTS 播放被静默拦截（Safari 里则是硬限制无法绕过，App 里此开关可解）。
+        webConfiguration.mediaTypesRequiringUserActionForPlayback = []
         webConfiguration.selectionGranularity = .character
         // enable developer extras
         if #available(iOS 16.4, *) {
