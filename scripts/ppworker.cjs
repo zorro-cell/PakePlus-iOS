@@ -90,7 +90,15 @@ const updateWebEnv = async (webview) => {
 }
 
 // set github env
-const setGithubEnv = (name, version, pubBody, isHtml) => {
+const setGithubEnv = (
+    name,
+    version,
+    pubBody,
+    isHtml,
+    artifactName,
+    bundleId,
+    buildNumber
+) => {
     console.log('setGithubEnv......')
     const envPath = process.env.GITHUB_ENV
     if (!envPath) {
@@ -103,6 +111,9 @@ const setGithubEnv = (name, version, pubBody, isHtml) => {
             VERSION: version,
             PUBBODY: pubBody,
             ISHTML: isHtml,
+            ARTIFACT_NAME: artifactName,
+            BUNDLE_ID: bundleId,
+            BUILD_NUMBER: buildNumber,
         }
         for (const [key, value] of Object.entries(entries)) {
             if (value !== undefined) {
@@ -151,7 +162,13 @@ const updatePPPwdHtml = (
 }
 
 // update ios applicationId
-const updateProject = async (newBundleId, showName, direction = 'default') => {
+const updateProject = async (
+    newBundleId,
+    showName,
+    direction = 'default',
+    version,
+    buildNumber
+) => {
     // Write back only if changes were made
     const pbxprojPath = path.join(
         __dirname,
@@ -164,6 +181,14 @@ const updateProject = async (newBundleId, showName, direction = 'default') => {
         content = content.replaceAll(
             /PRODUCT_BUNDLE_IDENTIFIER = (.*?);/g,
             `PRODUCT_BUNDLE_IDENTIFIER = ${newBundleId};`
+        )
+        content = content.replaceAll(
+            /MARKETING_VERSION = (.*?);/g,
+            `MARKETING_VERSION = ${version};`
+        )
+        content = content.replaceAll(
+            /CURRENT_PROJECT_VERSION = (.*?);/g,
+            `CURRENT_PROJECT_VERSION = ${buildNumber};`
         )
         // clear project.pbxproj DisplayName
         console.log(`Updating Display Name to ${showName}...`)
@@ -316,6 +341,8 @@ const main = async () => {
         version,
         webUrl,
         id,
+        artifactName,
+        buildNumber,
         pubBody,
         debug,
         safeArea,
@@ -344,10 +371,18 @@ const main = async () => {
     )
 
     // update ios applicationId
-    await updateProject(id, showName, direction)
+    await updateProject(id, showName, direction, version, buildNumber)
 
     // set github env
-    setGithubEnv(name, version, pubBody, isHtml)
+    setGithubEnv(
+        name,
+        version,
+        pubBody,
+        isHtml,
+        artifactName,
+        id,
+        buildNumber
+    )
 
     // parse Info.plist and update baseUrl
     const userAgent = webview.userAgent

@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "pp:worker": "node ./scripts/ppworker.cjs",
+        "validate:ipad": "node ./scripts/validate-chatgpt-ipad.cjs",
         "restore": "git restore .",
         "icon": "appicon app-icon.png --output-path ./PakePlus/Assets.xcassets/AppIcon.appiconset",
         "merge:main": "git checkout main && git merge web3 && git push",

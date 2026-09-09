@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 import WebKit
 
+private let chatGPTiPadSafariUserAgent = "Mozilla/5.0 (iPad; CPU OS 16_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
+
 struct WebView: UIViewRepresentable {
     let webUrl: URL
     let debug: Bool
@@ -27,7 +29,7 @@ struct WebView: UIViewRepresentable {
                     meta.name = 'viewport';
                     document.head.appendChild(meta);
                 }
-                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
             """,
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
@@ -140,10 +142,14 @@ struct WebView: UIViewRepresentable {
         webView.isOpaque = true
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
+        webView.scrollView.keyboardDismissMode = .interactive
 
-        // Match Mobile Safari on the user's iOS release. This restores the
-        // immersive WKWebView UI while improving compatibility with web auth.
-        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+        // Match iPad Safari on the target iPadOS release. The Info.plist value
+        // is generated from ppconfig; keep this fallback for direct Xcode runs.
+        let configuredUserAgent = Bundle.main.object(forInfoDictionaryKey: "USERAGENT") as? String
+        webView.customUserAgent = configuredUserAgent?.isEmpty == false
+            ? configuredUserAgent
+            : chatGPTiPadSafariUserAgent
 
         if #available(iOS 16.4, *) {
             webView.isInspectable = debug

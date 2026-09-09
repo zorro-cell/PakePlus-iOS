@@ -1,4 +1,4 @@
-name: Build IPA
+name: Build ChatGPT iPad IPA
 
 on:
     workflow_dispatch:
@@ -36,7 +36,9 @@ jobs:
             - name: Init Project Config
               run: |
                   pnpm install --no-frozen-lockfile
+                  pnpm validate:ipad
                   pnpm pp:worker
+                  pnpm validate:ipad
 
             - name: Generate AppIcon
               run: |
@@ -48,28 +50,43 @@ jobs:
             - name: Build for Release
               run: |
                   xcodebuild -project PakePlus.xcodeproj -scheme PakePlus -configuration Release -sdk iphoneos \
+                    -destination 'generic/platform=iOS' -derivedDataPath "$PWD/build/DerivedData" \
                     CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+                  APP_PATH="$PWD/build/DerivedData/Build/Products/Release-iphoneos/PakePlus.app"
+                  test -d "$APP_PATH"
+                  /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist"
+                  /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist"
+                  /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Info.plist"
 
             - name: Package IPA
               run: |
-                  APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -type d -name "PakePlus.app" | grep Release-iphoneos | head -n 1)
-                  echo "APP_PATH is $APP_PATH"
-                  mkdir -p Payload
-                  cp -R "$APP_PATH" Payload/
-                  NAME="${{ env.NAME }}"
-                  VERSION="${{ env.VERSION }}"
-                  ISHTML="${{ env.ISHTML }}"
-                  ${ISHTML} && cp -R ./Scripts/www/* ./Payload/PakePlus.app/
-                  zip -r ${NAME}-${VERSION}.ipa Payload
-                  mkdir -p export
-                  mv ${NAME}-${VERSION}.ipa export/
+                  set -euo pipefail
+                  APP_PATH="$PWD/build/DerivedData/Build/Products/Release-iphoneos/PakePlus.app"
+                  IPA_DIR="$PWD/build/ipa"
+                  IPA_PATH="$PWD/build/${ARTIFACT_NAME}-${VERSION}.ipa"
+                  rm -rf "$IPA_DIR" "$IPA_PATH"
+                  mkdir -p "$IPA_DIR/Payload"
+                  cp -R "$APP_PATH" "$IPA_DIR/Payload/"
+                  if [[ "$ISHTML" == "true" ]]; then
+                      cp -R ./scripts/www/* "$IPA_DIR/Payload/PakePlus.app/"
+                  fi
+                  (cd "$IPA_DIR" && zip -qry "$IPA_PATH" Payload)
+                  test -f "$IPA_PATH"
+                  unzip -l "$IPA_PATH" | sed -n '1,12p'
+
+            - name: Upload IPA artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: '${{ env.ARTIFACT_NAME }}-${{ env.VERSION }}'
+                  path: build/${{ env.ARTIFACT_NAME }}-${{ env.VERSION }}.ipa
+                  if-no-files-found: error
 
             - name: Publish IPA
               uses: softprops/action-gh-release@v1
               with:
-                  files: export/${{ env.NAME }}-${{ env.VERSION }}.ipa
-                  tag_name: '${{ env.NAME }}'
-                  name: '${{ env.NAME }} v${{ env.VERSION }}'
+                  files: build/${{ env.ARTIFACT_NAME }}-${{ env.VERSION }}.ipa
+                  tag_name: '${{ env.ARTIFACT_NAME }}-v${{ env.VERSION }}'
+                  name: '${{ env.ARTIFACT_NAME }} v${{ env.VERSION }}'
                   body: '${{ env.PUBBODY }}'
                   draft: false
               env:
