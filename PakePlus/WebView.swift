@@ -36,6 +36,28 @@ struct WebView: UIViewRepresentable {
         )
         configuration.userContentController.addUserScript(viewportScript)
 
+        // ChatGPT's iPad layout keeps the document shell fixed and scrolls
+        // conversation content in nested DOM elements. Keep native momentum
+        // scrolling enabled for those elements without changing overflow,
+        // touch-action, or any ChatGPT-specific selectors.
+        let nestedScrollScript = WKUserScript(
+            source: """
+                (() => {
+                    const style = document.createElement('style');
+                    style.setAttribute('data-pp-nested-scroll', 'true');
+                    style.textContent = `
+                        html, body, * {
+                            -webkit-overflow-scrolling: touch !important;
+                        }
+                    `;
+                    (document.head || document.documentElement)?.appendChild(style);
+                })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        configuration.userContentController.addUserScript(nestedScrollScript)
+
         let compatibilityScript = WKUserScript(
             source: """
                 (() => {
@@ -143,6 +165,8 @@ struct WebView: UIViewRepresentable {
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.keyboardDismissMode = .interactive
+        webView.scrollView.isScrollEnabled = true
+        webView.scrollView.alwaysBounceVertical = true
 
         // Match iPad Safari on the target iPadOS release. The Info.plist value
         // is generated from ppconfig; keep this fallback for direct Xcode runs.

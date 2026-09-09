@@ -158,11 +158,11 @@
     "ios": {
         "name": "ChatGPT iPad",
         "showName": "ChatGPT iPad",
-        "version": "1.5.0",
+        "version": "1.5.1",
         "webUrl": "https://chatgpt.com/",
         "id": "com.zorrocell.chatgpt.ipad",
         "artifactName": "ChatGPT-iPad",
-        "buildNumber": "6",
+        "buildNumber": "7",
         "icon": "./app-icon.png",
         "desc": "Personal iPad wrapper for the ChatGPT website.",
         "pubBody": "Immersive ChatGPT iPad wrapper with compact composer layout and iPadOS 16 voice compatibility handling.",
