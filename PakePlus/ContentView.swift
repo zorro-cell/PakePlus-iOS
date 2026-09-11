@@ -33,13 +33,20 @@ struct ContentView: View {
             .ignoresSafeArea(edges: [.bottom])
             .allowsHitTesting(isWebLoaded)
             
-            // loading screen
-            if !isWebLoaded && launchImage {
-                Image("LaunchScreen")
-                    .resizable()
-                    .scaledToFill()
-                    .ignoresSafeArea()
-                    .transition(.opacity)
+            if !isWebLoaded {
+                ZStack {
+                    if launchImage {
+                        Image("LaunchScreen")
+                            .resizable()
+                            .scaledToFill()
+                            .ignoresSafeArea()
+                    } else {
+                        Color.black.ignoresSafeArea()
+                    }
+                    ProgressView()
+                        .tint(.white)
+                }
+                .transition(.opacity)
             }
         }
         .background(Color.black.ignoresSafeArea())

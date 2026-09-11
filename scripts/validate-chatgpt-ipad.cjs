@@ -20,8 +20,8 @@ const workflow = read('.github/workflows/build.yml')
 const expected = {
     bundleId: 'com.zorrocell.chatgpt.ipad',
     phoneBundleId: 'com.zorrocell.chatgpt.webapp',
-    version: '1.5.1',
-    buildNumber: '7',
+    version: '1.6.0',
+    buildNumber: '8',
     artifactName: 'ChatGPT-iPad',
     userAgent:
         'Mozilla/5.0 (iPad; CPU OS 16_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
@@ -78,15 +78,20 @@ assert(plist.includes(`<string>${expected.userAgent}</string>`), 'Info.plist use
 assert(webView.includes('viewport-fit=cover'), 'iPad viewport-fit handling is missing')
 assert(webView.includes('keyboardDismissMode = .interactive'), 'keyboard dismissal handling is missing')
 assert(webView.includes('scrollView.isScrollEnabled = true'), 'WKWebView scrolling is not explicitly enabled')
-assert(webView.includes('scrollView.alwaysBounceVertical = true'), 'vertical WKWebView scrolling is not enabled')
-assert(webView.includes('let nestedScrollScript = WKUserScript'), 'nested scroll compatibility script is missing')
-assert(webView.includes('injectionTime: .atDocumentStart'), 'nested scroll script must run before ChatGPT layout')
-assert(webView.includes('-webkit-overflow-scrolling: touch'), 'nested DOM momentum scrolling is missing')
-assert(webView.includes('forMainFrameOnly: false'), 'nested scroll script must cover embedded web content')
+assert(webView.includes('scrollView.bounces = false'), 'outer WKWebView rubber-band must be disabled')
+assert(!webView.includes('alwaysBounceVertical'), 'legacy vertical bounce override remains')
+assert(!webView.includes('nestedScrollScript'), 'legacy nested scroll script remains')
+assert(!webView.includes('MutationObserver'), 'full-page compatibility observer remains')
+assert(webView.includes('didFinishOnce'), 'navigation recovery callback guard is missing')
+assert(webView.includes('onLoadFinished?()'), 'navigation recovery callback was removed')
 assert(webView.includes('javaScriptCanOpenWindowsAutomatically = true'), 'OAuth popup support flag is missing')
 assert(webView.includes('createWebViewWith configuration'), 'OAuth window delegate handling is missing')
 assert(webView.includes(expected.userAgent), 'Swift Safari user agent fallback is stale')
 assert(!webView.includes('iPhone; CPU'), 'iPhone-only user agent leaked into the iPad variant')
+const contentView = read('PakePlus/ContentView.swift')
+assert(contentView.includes('ProgressView()'), 'startup loading progress state is missing')
+assert(contentView.includes('if !isWebLoaded'), 'startup readiness state is missing')
+assert(contentView.includes('.allowsHitTesting(isWebLoaded)'), 'web content interaction gate is missing')
 
 assert(workflow.includes('Build ChatGPT iPad IPA'), 'workflow identity is not explicit')
 assert(workflow.includes('ARTIFACT_NAME'), 'workflow output name is not sourced explicitly')
