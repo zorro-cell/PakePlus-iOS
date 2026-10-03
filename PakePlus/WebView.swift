@@ -140,7 +140,6 @@ struct WebView: UIViewRepresentable {
 class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, CLLocationManagerDelegate {
     private let onLoadFinished: (() -> Void)?
     fileprivate var lastRefreshRequest = 0
-    private var didFinishMainFrameOnce = false
     private var locationManager: CLLocationManager?
     weak var webView: WKWebView?
 
@@ -221,20 +220,14 @@ class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        // only respond to main frame, and only trigger once, avoid iframe / multiple redirects causing repeated hiding
-        guard !didFinishMainFrameOnce else { return }
-        didFinishMainFrameOnce = true
-
+        // Notify on each completed navigation so the native refresh control can re-enable.
         DispatchQueue.main.async { [onLoadFinished] in
             onLoadFinished?()
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        // avoid certain loading failures causing it to stay on the launch screen/loading
-        guard !didFinishMainFrameOnce else { return }
-        didFinishMainFrameOnce = true
-
+        // Also release the refresh control when a reload fails.
         DispatchQueue.main.async { [onLoadFinished] in
             onLoadFinished?()
         }

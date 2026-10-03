@@ -163,12 +163,12 @@
     "ios": {
         "name": "hermes",
         "showName": "hermes",
-        "version": "1.0.9",
+        "version": "1.0.10",
         "webUrl": "https://192.168.31.6:8443",
         "id": "com.zorrocell.hermes.webapp",
         "icon": "./app-icon.png",
-        "desc": "Hermes Studio iOS wrapper with manual native refresh button and automatic refresh removed. Existing HTTPS, voice bridge, and layout preserved.",
-        "pubBody": "Unsigned Hermes Studio v1.0.9 IPA for TrollStore. Removes periodic/background auto-refresh and adds native manual refresh button; preserves HTTPS host, voice bridge, and existing layout.",
+        "desc": "Hermes Studio iOS wrapper with native manual refresh button and automatic refresh removed. Existing HTTPS, voice bridge, and layout preserved.",
+        "pubBody": "Unsigned Hermes Studio v1.0.10 IPA for TrollStore. Removes periodic/background auto-refresh and adds a native manual refresh button. Preserves HTTPS host, voice bridge, and existing layout.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"
