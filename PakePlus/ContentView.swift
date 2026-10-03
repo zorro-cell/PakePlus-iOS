@@ -18,6 +18,8 @@ struct ContentView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var isWebLoaded: Bool = false
+    @State private var refreshRequest = 0
+    @State private var isRefreshing = false
 
     var body: some View {
         // BottomMenuView()
@@ -31,8 +33,10 @@ struct ContentView: View {
             WebView(
                 webUrl: URL(string: webUrl)!,
                 debug: debug,
+                refreshRequest: refreshRequest,
                 onLoadFinished: {
                     isWebLoaded = true
+                    isRefreshing = false
                 }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -48,6 +52,25 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
             }
+
+            // Native control remains available even when the webpage's JS is stalled.
+            Button {
+                guard !isRefreshing else { return }
+                isRefreshing = true
+                refreshRequest &+= 1
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundColor(.white.opacity(0.72))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isRefreshing)
+            .accessibilityLabel("刷新")
+            .padding(.top, 51)
+            .padding(.trailing, 72)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
         .ignoresSafeArea(.container, edges: .all)
         .statusBarHidden(fullScreen)

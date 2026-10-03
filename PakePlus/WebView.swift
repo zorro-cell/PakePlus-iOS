@@ -18,6 +18,8 @@ struct WebView: UIViewRepresentable {
     let debug: Bool
     // on load finished
     let onLoadFinished: (() -> Void)?
+    // Native refresh button request. Incremented by the host view.
+    let refreshRequest: Int
     // userAgent
     let userAgent = Bundle.main.object(forInfoDictionaryKey: "USERAGENT") as? String ?? ""
 
@@ -122,7 +124,11 @@ struct WebView: UIViewRepresentable {
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        guard refreshRequest != context.coordinator.lastRefreshRequest else { return }
+        context.coordinator.lastRefreshRequest = refreshRequest
+        uiView.reload()
+    }
 
     // add coordinator to prevent zoom
     func makeCoordinator() -> Coordinator {
@@ -133,6 +139,7 @@ struct WebView: UIViewRepresentable {
 // swifui coordinator
 class Coordinator: NSObject, UIScrollViewDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, CLLocationManagerDelegate {
     private let onLoadFinished: (() -> Void)?
+    fileprivate var lastRefreshRequest = 0
     private var didFinishMainFrameOnce = false
     private var locationManager: CLLocationManager?
     weak var webView: WKWebView?

@@ -163,12 +163,12 @@
     "ios": {
         "name": "hermes",
         "showName": "hermes",
-        "version": "1.0.8",
+        "version": "1.0.9",
         "webUrl": "https://192.168.31.6:8443",
         "id": "com.zorrocell.hermes.webapp",
         "icon": "./app-icon.png",
-        "desc": "Hermes Studio iOS wrapper with edge-to-edge web wallpaper, safe-area web content, and native speech input. v1.0.8 uses HTTPS host https://192.168.31.6:8443 (secure context for mic) and allows audio autoplay so AI voice replies play without a tap.",
-        "pubBody": "Unsigned Hermes Studio v1.0.8 IPA for TrollStore. HTTPS host https://192.168.31.6:8443 (secure context for microphone) + WKWebView media autoplay enabled so voice replies play automatically. Built on the v1.0.6 baseline.",
+        "desc": "Hermes Studio iOS wrapper with manual native refresh button and automatic refresh removed. Existing HTTPS, voice bridge, and layout preserved.",
+        "pubBody": "Unsigned Hermes Studio v1.0.9 IPA for TrollStore. Removes periodic/background auto-refresh and adds native manual refresh button; preserves HTTPS host, voice bridge, and existing layout.",
         "isHtml": false,
         "debug": false,
         "safeArea": "safe"
