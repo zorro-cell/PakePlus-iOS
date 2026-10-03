@@ -33,11 +33,11 @@ struct ContentView: View {
             WebView(
                 webUrl: URL(string: webUrl)!,
                 debug: debug,
-                refreshRequest: refreshRequest,
                 onLoadFinished: {
                     isWebLoaded = true
                     isRefreshing = false
-                }
+                },
+                refreshRequest: refreshRequest
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, -4)

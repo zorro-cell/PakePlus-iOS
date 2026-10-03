@@ -19,7 +19,7 @@ struct WebView: UIViewRepresentable {
     // on load finished
     let onLoadFinished: (() -> Void)?
     // Native refresh button request. Incremented by the host view.
-    let refreshRequest: Int
+    var refreshRequest: Int = 0
     // userAgent
     let userAgent = Bundle.main.object(forInfoDictionaryKey: "USERAGENT") as? String ?? ""
 
