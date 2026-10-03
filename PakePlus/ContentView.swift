@@ -60,7 +60,7 @@ struct ContentView: View {
                 refreshRequest &+= 1
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundColor(.white.opacity(0.72))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -68,7 +68,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .disabled(isRefreshing)
             .accessibilityLabel("刷新")
-            .padding(.top, 51)
+            .padding(.top, 61)
             .padding(.trailing, 72)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
